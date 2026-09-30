@@ -1,0 +1,7 @@
+.context/
+.env*
+!.env.example
+.conductor/settings.local.toml
+node_modules/
+dist/
+.superpowers/

@@ -1,0 +1,32 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "npm install"
+run_mode = "concurrent"
+
+[scripts.run.dev]
+available_in = ["local"]
+command = "npm run dev -- --port $CONDUCTOR_PORT"
+default = true
+icon = "play"
+
+[scripts.run.dev_cloud]
+available_in = ["cloud"]
+command = "npm run dev -- --host 0.0.0.0"
+default = true
+icon = "play"
+
+[scripts.run.check]
+command = "npm run check && npm run build"
+icon = "check-check"
+
+[prompts]
+general = """
+Follow AGENTS.md. At session start, read .agents/skills/using-superpowers/SKILL.md and relevant skills.
+Codex implements tracked files. New features start brainstorming and follow owner design gates; bugs start systematic-debugging.
+An approved design and plan handoff resumes those artifacts. Claude follows CLAUDE.md, reviews independently, and does not edit tracked files.
+"""
+code_review = "Review the complete diff against the actual PR base, acceptance criteria, tests, and security effects. Return numbered findings with file and line references; do not edit tracked files."
+
+[environment_variables]
+SUPERPOWERS_DISABLE_TELEMETRY = "1"

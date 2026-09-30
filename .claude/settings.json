@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "deny": ["Edit(/**)", "NotebookEdit", "Bash(codex exec *)", "Bash(git push *)", "Bash(git reset *)", "Bash(git checkout *)", "Bash(git commit *)", "Bash(git restore *)", "Bash(git clean *)", "Bash(git stash *)", "Bash(git switch *)", "Bash(git merge *)", "Bash(git rebase *)", "Bash(gh pr merge *)"]
+  }
+}
