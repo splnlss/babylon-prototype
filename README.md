@@ -21,6 +21,10 @@ Vite prints the localhost URL. `npm run check` runs TypeScript and behavior test
 - Desktop: click the scene for pointer-lock mouse look; W/A/S/D or arrow keys to walk; Escape to release the mouse; Reset view to return to the start.
 - WebXR: Enter VR on a supported headset; head tracking to look around; left thumbstick to walk; Exit VR or the headset system action to leave. Desktop input is detached while VR is active.
 
+Two floating markers in the Ronda scene trigger media after you stand nearby for about 250 ms. The blue marker starts a fixed video surface; the amber marker starts audio that continues after you walk away. Approaching another marker replaces the current media. Click the video surface to pause or resume; with pointer lock, aim the centre reticle and click. In VR, select the surface with a controller ray. If autoplay is blocked or a source fails, use the visible Play/Retry action. Media is requested only after a POI activates.
+
+Open `?poiEditor=1` for a crude desktop placement view. Walk with W/A/S/D and turn with Q/E while the editor is open; typing in a field pauses movement. Select either POI, edit its source-space coordinates, use **Use current location**, and place or resize the solid video plane. **Download JSON** exports `ronda-pois.json`; review and copy it to [src/pois/ronda.json](src/pois/ronda.json) to use the draft. The editor does not play media, acquire pointer lock, save the draft automatically, or edit media URLs. The positions and floor height are provisional scene-unit placements, not surveyed exhibit coordinates.
+
 Walking stays horizontal at a visually chosen eye height. There is no collision geometry, inferred floor, terrain following, or geospatial anchor. You can pass through visible objects. XR uses the headset's physical eye height over a fixed scene plane; the scene scale is an estimate rather than a surveyed metre scale.
 
 ## Asset and rendering limits

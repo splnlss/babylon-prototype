@@ -3,6 +3,7 @@ export const MANIFEST_URL = 'https://pub-dd92ae5131ec49f1bbd411b51a858249.r2.dev
 export const START = { x: 0, y: 5, z: 40 } as const;
 export const TARGET = { x: 0, y: 5, z: 0 } as const;
 export const WALK_SPEED = 3;
+export const POI_FLOOR_Y = 3.4;
 
 export const STREAM_OPTIONS = {
   memoryBudgetMb: 128,

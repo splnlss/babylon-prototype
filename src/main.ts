@@ -1,18 +1,25 @@
 import { Color4 } from '@babylonjs/core/Maths/math.color.js';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Matrix, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
+import { Ray } from '@babylonjs/core/Culling/ray.js';
 import { Engine } from '@babylonjs/core/Engines/engine.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { UniversalCamera } from '@babylonjs/core/Cameras/universalCamera.js';
 import { GaussianSplattingStream } from '@babylonjs/loaders/SPLAT/gaussianSplattingStream.js';
-import { MANIFEST_URL, START, STREAM_OPTIONS, TARGET } from './config.js';
+import { MANIFEST_URL, POI_FLOOR_Y, START, STREAM_OPTIONS, TARGET } from './config.js';
 import { fetchManifest, replaceStream } from './sog.js';
 import { createOverlay } from './ui.js';
-import { attachDesktopControls } from './desktop.js';
+import { attachDesktopControls, isEditorFieldFocused } from './desktop.js';
 import { WebXRDefaultExperience } from '@babylonjs/core/XR/webXRDefaultExperience.js';
 import { WebXRManagedOutputCanvasOptions } from '@babylonjs/core/XR/webXRManagedOutputCanvas.js';
 import { WebXRState } from '@babylonjs/core/XR/webXRTypes.js';
 import { attachXrMovement, prepareStereoSplatSort, syncStereoSplatIndexBuffers } from './xr.js';
 import { XR_FIXED_FOVEATION, XR_FRAMEBUFFER_SCALE, XR_SPLAT_BUDGET } from './config.js';
+import poiJson from './pois/ronda.json';
+import { loadPoiManifest, tryResolvePois, xrStandingBody, PoiTracker, type Poi, type PoiManifestV1 } from './pois.js';
+import { MediaPlayer } from './media.js';
+import { PoiScene } from './poiScene.js';
+import { selectMediaFromRay } from './poiInput.js';
+import { createPoiDraft, createPlacementEditor } from './poiEditor.js';
 import './style.css';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -34,15 +41,71 @@ camera.setTarget(new Vector3(TARGET.x, TARGET.y, TARGET.z));
 camera.minZ = 0.05;
 camera.maxZ = 500;
 scene.activeCamera = camera;
-let detachDesktop: (() => void) | null = attachDesktopControls(canvas, camera, scene);
+const loadedPois = loadPoiManifest(poiJson, MANIFEST_URL);
+const poiManifest: PoiManifestV1 = loadedPois.manifest;
+overlay.setPoiWarning(loadedPois.warning);
+const draft = createPoiDraft(poiManifest);
+const editorRequested = new URLSearchParams(location.search).get('poiEditor') === '1';
+let editorVisible = editorRequested;
+let hostMatrix = Matrix.Scaling(1, -1, 1);
+let tracker: PoiTracker | null = null;
+let livePois: Poi[] = [];
+const media = new MediaPlayer();
+const poiScene = new PoiScene(scene);
+media.subscribe(status => { overlay.setMediaStatus(status); poiScene.setMediaStatus(status); });
+overlay.onMediaRetry(() => media.retryFromGesture());
+const editorRoot = document.querySelector<HTMLElement>('#overlay')!;
+let editorPanel: HTMLElement | null = null;
+if (editorRequested) {
+  createPlacementEditor(editorRoot, draft, {
+    hostMatrix: () => hostMatrix,
+    bodyWorld: () => new Vector3(camera.position.x, POI_FLOOR_Y, camera.position.z),
+    headPose: () => ({ position: camera.position.clone(), forward: camera.getForwardRay().direction }),
+    onChange: () => {
+      if (!editorVisible) return;
+      const resolved = tryResolvePois(draft, hostMatrix);
+      overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
+      poiScene.setPois(resolved.pois, true);
+    },
+  });
+  editorPanel = editorRoot.querySelector<HTMLElement>('.poi-editor');
+}
+function selectFromRay(ray: Ray): boolean {
+  return selectMediaFromRay(scene, ray, poiScene.selectableMeshes, media.status.phase,
+    () => media.toggleVideoFromGesture(), () => media.retryFromGesture());
+}
+const desktopOptions = {
+  shouldWalk: () => !isEditorFieldFocused(),
+  shouldCaptureLock: () => !editorVisible,
+  shouldTurnWithKeys: () => editorVisible,
+  routeCanvasClick: (event: MouseEvent) => {
+    if (editorVisible || xr?.baseExperience.state === WebXRState.IN_XR) return false;
+    const locked = document.pointerLockElement === canvas;
+    const rect = canvas.getBoundingClientRect();
+    const ray = locked ? camera.getForwardRay(100) : scene.createPickingRay(
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+      Matrix.Identity(), camera,
+    );
+    return selectFromRay(ray);
+  },
+};
+let detachDesktop: (() => void) | null = attachDesktopControls(canvas, camera, scene, desktopOptions);
+document.addEventListener('pointerlockchange', () => overlay.setPointerLocked(document.pointerLockElement === canvas));
 let detachXr: (() => void) | null = null;
 let xr: WebXRDefaultExperience | null = null;
+let detachXrSelect: (() => void) | null = null;
 
 let stream: GaussianSplattingStream | null = null;
 let loadGeneration = 0;
 
 async function loadScene() {
   const generation = ++loadGeneration;
+  media.stop();
+  tracker?.reset();
+  tracker = null;
+  livePois = [];
+  poiScene.dispose();
   overlay.setStatus('Loading scene manifest…');
   try {
     const { metadata, rootUrl } = await fetchManifest(MANIFEST_URL);
@@ -51,17 +114,53 @@ async function loadScene() {
     if (xr?.baseExperience.state === WebXRState.IN_XR) stream.splatBudget = XR_SPLAT_BUDGET;
     // This SOG's visual orientation was checked at the start pose. Keep Babylon's Y flip.
     stream.rotation.x = 0;
+    hostMatrix = stream.computeWorldMatrix(true).clone();
     overlay.setStatus('Streaming scene detail…');
     const current = stream;
     await current.whenSettledAsync();
     if (generation !== loadGeneration) return;
     if (current.isDisposed()) throw new Error(`Scene chunks failed to load from ${rootUrl}.`);
+    const resolved = tryResolvePois(poiManifest, hostMatrix);
+    livePois = resolved.pois;
+    overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
+    tracker = new PoiTracker(livePois, 0.25);
+    poiScene.setPois(editorVisible ? tryResolvePois(draft, hostMatrix).pois : livePois, editorVisible);
     overlay.setStatus(xr?.baseExperience.state === WebXRState.IN_XR ? 'VR active · move with the left thumbstick' : 'Scene ready · walk to explore');
   } catch (error) {
     if (generation !== loadGeneration) return;
     overlay.setError(error instanceof Error ? error.message : String(error));
   }
 }
+
+function setEditorVisible(visible: boolean): void {
+  if (!editorRequested || editorVisible === visible) return;
+  editorVisible = visible;
+  if (editorPanel) editorPanel.hidden = !visible;
+  media.stop();
+  tracker?.reset();
+  if (stream && tracker) {
+    const resolved = visible ? tryResolvePois(draft, hostMatrix) : { pois: livePois, warning: null };
+    overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
+    poiScene.setPois(resolved.pois, visible);
+  }
+}
+
+scene.onBeforeRenderObservable.add(() => {
+  if (!tracker || editorVisible) return;
+  const inXr = xr?.baseExperience.state === WebXRState.IN_XR;
+  const xrCamera = xr?.baseExperience.camera;
+  const body = inXr && xrCamera ? xrStandingBody(xrCamera.position, xrCamera.realWorldHeight) : new Vector3(camera.position.x, POI_FLOOR_Y, camera.position.z);
+  for (const event of tracker.update(body, performance.now())) {
+    if (event.type === 'exit') media.exit(event.id);
+    else if (event.type === 'enter' || event.type === 'replace') {
+      const targetId = event.type === 'replace' ? event.newId : event.id;
+      const poi = livePois.find(item => item.id === targetId);
+      if (poi) media.activate(poi);
+    }
+  }
+  const view = inXr && xrCamera ? xrCamera : camera;
+  poiScene.updateStatusPose(view.position, view.getForwardRay().direction);
+});
 
 function resetView() {
   if (xr?.baseExperience.state === WebXRState.IN_XR) {
@@ -116,10 +215,21 @@ async function setupXr() {
     });
     experience.baseExperience.onStateChangedObservable.add(state => {
       if (state === WebXRState.IN_XR) {
+        setEditorVisible(false);
         experience.baseExperience.sessionManager.fixedFoveation = XR_FIXED_FOVEATION;
         detachDesktop?.();
         detachDesktop = null;
         detachXr = attachXrMovement(scene, experience);
+        const session = experience.baseExperience.sessionManager.session;
+        const onSelect = (event: XRInputSourceEvent) => {
+          const controller = experience.input.controllers.find(item => item.inputSource === event.inputSource);
+          if (!controller) return;
+          const ray = new Ray(Vector3.Zero(), new Vector3(0, 0, -1), 100);
+          controller.getWorldPointerRayToRef(ray);
+          selectFromRay(ray);
+        };
+        session.addEventListener('select', onSelect);
+        detachXrSelect = () => session.removeEventListener('select', onSelect);
         if (stream) stream.splatBudget = XR_SPLAT_BUDGET;
         overlay.setVrActive(true);
         overlay.setStatus('VR active · move with the left thumbstick');
@@ -127,7 +237,10 @@ async function setupXr() {
         lastStereoIndex = null;
         detachXr?.();
         detachXr = null;
-        if (!detachDesktop) detachDesktop = attachDesktopControls(canvas, camera, scene);
+        detachXrSelect?.();
+        detachXrSelect = null;
+        setEditorVisible(editorRequested);
+        if (!detachDesktop) detachDesktop = attachDesktopControls(canvas, camera, scene, desktopOptions);
         if (stream) stream.splatBudget = STREAM_OPTIONS.splatBudget;
         overlay.setVrActive(false);
         overlay.setStatus('Scene ready · walk to explore');
@@ -153,6 +266,6 @@ overlay.onEnterVr(() => {
 });
 engine.runRenderLoop(() => scene.render());
 window.addEventListener('resize', () => engine.resize());
-window.addEventListener('pagehide', () => { detachDesktop?.(); detachXr?.(); xr?.dispose(); stream?.dispose(); scene.dispose(); engine.dispose(); });
+window.addEventListener('pagehide', () => { detachDesktop?.(); detachXr?.(); detachXrSelect?.(); media.dispose(); poiScene.dispose(); xr?.dispose(); stream?.dispose(); scene.dispose(); engine.dispose(); });
 void loadScene();
 void setupXr();
