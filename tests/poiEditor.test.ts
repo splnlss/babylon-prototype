@@ -8,10 +8,11 @@ import { createPoiDraft, setPoiFromWorld, placeVideoAhead, exportPoiJson } from 
 describe('placement draft and export', () => {
   it('copies the manifest and maps a standing location back through the reflective host', () => {
     const source = parsePoiManifest(manifestJson, MANIFEST_URL);
+    const originalAudioPosition = [...source.pois[1].position];
     const draft = createPoiDraft(source);
     setPoiFromWorld(draft, 'audio', new Vector3(3, 3.4, 30), Matrix.Scaling(1, -1, 1));
     expect(draft.pois[1].position).toEqual([3, -3.4, 30]);
-    expect(source.pois[1].position).toEqual([2, -3.4, 32]);
+    expect(source.pois[1].position).toEqual(originalAudioPosition);
   });
 
   it('places the plane 1.8 units ahead and facing the visitor, then exports loadable JSON', () => {

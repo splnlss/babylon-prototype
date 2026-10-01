@@ -6,13 +6,13 @@
       "id": "video",
       "title": "Video",
       "kind": "video",
-      "position": [0, -3.4, 37],
+      "position": [-0.7, 0.4, 18.5],
       "standingRadius": 0.8,
       "exitRadius": 1.1,
-      "muxPlaybackId": "rR8P8mSaKDzz02TsftugTUdI00cQPJX00oy",
+      "muxPlaybackId": "00UWevxtFkfuKdqmXsJmdXqXXqWTcxSBjEuIrpejlYk00",
       "video": {
-        "position": [0, -5.05, 35.2],
-        "rotationDeg": [0, 180, 0],
+        "position": [-0.7, -1.2, 17.3],
+        "rotationDeg": [0, 205, 0],
         "width": 1.6,
         "height": 0.9
       }
@@ -21,7 +21,7 @@
       "id": "audio",
       "title": "Audio",
       "kind": "audio",
-      "position": [2, -3.4, 32],
+      "position": [-2.4, 0.4, 18],
       "standingRadius": 0.8,
       "exitRadius": 1.1,
       "muxPlaybackId": "BvRHSlj5WGXeIG2HCr5t9w02ZMUXmzLkKNYofkE02JgH00",

@@ -42,6 +42,16 @@ describe('overlay', () => {
     expect(resets).toBe(1);
   });
 
+  it('places the VR action in the top overlay with a dedicated pill style', () => {
+    const overlay = createOverlay(document.querySelector('#overlay') as HTMLElement);
+    const vr = document.querySelector<HTMLButtonElement>('[data-action="vr"]')!;
+    expect(vr.closest('.hud-top')).toBeTruthy();
+    expect(vr.classList.contains('vr-button')).toBe(true);
+    overlay.setVrAvailable(true);
+    expect(vr.disabled).toBe(false);
+    expect(vr.textContent).toBe('Enter VR');
+  });
+
   it('shows an unsupported browser error without offering a network retry', () => {
     const overlay = createOverlay(document.querySelector('#overlay') as HTMLElement);
     overlay.setError('WebGL2 is required for this viewer.', false);

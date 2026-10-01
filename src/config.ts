@@ -1,9 +1,9 @@
 export const MANIFEST_URL = 'https://pub-dd92ae5131ec49f1bbd411b51a858249.r2.dev/20260820_RondaLobato/lod-meta.json';
 
-export const START = { x: 0, y: 5, z: 40 } as const;
-export const TARGET = { x: 0, y: 5, z: 0 } as const;
+export const START = { x: 2.5, y: 1.2, z: 24 } as const;
+export const TARGET = { x: -1, y: 1.2, z: 18 } as const;
 export const WALK_SPEED = 3;
-export const POI_FLOOR_Y = 3.4;
+export const POI_FLOOR_Y = -0.4;
 
 export const STREAM_OPTIONS = {
   memoryBudgetMb: 128,

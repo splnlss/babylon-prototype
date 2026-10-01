@@ -4,11 +4,14 @@ export function createOverlay(root: HTMLElement) {
   root.innerHTML = `
     <div class="hud">
       <div class="hud-top">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <div>
-            <p class="eyebrow">BABYLON WEBXR STUDY</p>
-            <h1>Ronda Lobato</h1>
+        <div class="hud-left">
+          <button type="button" class="vr-button" data-action="vr" disabled title="Checking immersive VR support">Enter VR</button>
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <div>
+              <p class="eyebrow">BABYLON WEBXR STUDY</p>
+              <h1>Ronda Lobato</h1>
+            </div>
           </div>
         </div>
         <div class="status-pill"><span class="status-light" aria-hidden="true"></span><span role="status">Preparing viewer…</span></div>
@@ -24,7 +27,6 @@ export function createOverlay(root: HTMLElement) {
           <div class="actions">
             <button type="button" data-action="reset">Reset view</button>
             <button type="button" data-action="retry" hidden>Retry loading</button>
-            <button type="button" data-action="vr" disabled title="Checking immersive VR support">Enter VR</button>
           </div>
         </div>
         <p class="scene-note">Gaussian splat scene · No collision boundaries</p>

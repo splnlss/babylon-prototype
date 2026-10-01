@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MediaPlayer, type MediaElement, type HlsSession } from '../src/media.js';
 import type { Poi } from '../src/pois.js';
 
-const video = { id: 'video', title: 'Video', kind: 'video', muxPlaybackId: 'rR8P8mSaKDzz02TsftugTUdI00cQPJX00oy' } as Poi;
+const video = { id: 'video', title: 'Video', kind: 'video', muxPlaybackId: '00UWevxtFkfuKdqmXsJmdXqXXqWTcxSBjEuIrpejlYk00' } as Poi;
 const audio = { id: 'audio', title: 'Audio', kind: 'audio', muxPlaybackId: 'BvRHSlj5WGXeIG2HCr5t9w02ZMUXmzLkKNYofkE02JgH00', fallbackUrl: 'https://example.test/audio.m4a' } as Poi & { fallbackUrl: string };
 
 function fixture(playError?: Error) {

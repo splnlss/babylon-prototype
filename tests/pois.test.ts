@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { MANIFEST_URL } from '../src/config.js';
+import { MANIFEST_URL, POI_FLOOR_Y, START } from '../src/config.js';
+import manifestJson from '../src/pois/ronda.json';
 import { parsePoiManifest, loadPoiManifest, resolvePois, tryResolvePois, xrStandingBody, PoiTracker } from '../src/pois.js';
 
-const videoId = 'rR8P8mSaKDzz02TsftugTUdI00cQPJX00oy';
+const videoId = '00UWevxtFkfuKdqmXsJmdXqXXqWTcxSBjEuIrpejlYk00';
 const audioId = 'BvRHSlj5WGXeIG2HCr5t9w02ZMUXmzLkKNYofkE02JgH00';
 const fallback = 'https://pub-dd92ae5131ec49f1bbd411b51a858249.r2.dev/20221110_rondajoseph-storyoutline_v1-AudioOnly.m4a';
 
@@ -20,6 +21,33 @@ function fixture() {
 }
 
 describe('POI manifest and mapping', () => {
+  it('uses the supplied Bob video playback ID in the shipped Ronda POI', () => {
+    const manifest = parsePoiManifest(manifestJson, MANIFEST_URL);
+    const video = manifest.pois.find(poi => poi.kind === 'video');
+    expect(video?.muxPlaybackId).toBe('00UWevxtFkfuKdqmXsJmdXqXXqWTcxSBjEuIrpejlYk00');
+  });
+
+  it('starts outside both nearby pole POIs and keeps the video surface by its marker', () => {
+    expect([START.x, START.y, START.z]).toEqual([2.5, 1.2, 24]);
+    expect(START.y - POI_FLOOR_Y).toBeCloseTo(1.6);
+    const pois = resolvePois(parsePoiManifest(manifestJson, MANIFEST_URL), Matrix.Scaling(1, -1, 1));
+    const start = new Vector3(START.x, POI_FLOOR_Y, START.z);
+    for (const poi of pois) {
+      const distance = Math.hypot(start.x - poi.worldPosition.x, start.z - poi.worldPosition.z);
+      expect(distance).toBeGreaterThan(poi.exitRadius);
+      expect(distance).toBeLessThan(9);
+    }
+    expect(Math.hypot(pois[0].worldPosition.x - pois[1].worldPosition.x, pois[0].worldPosition.z - pois[1].worldPosition.z)).toBeLessThan(2);
+    const video = pois.find(poi => poi.kind === 'video')!;
+    expect(Math.hypot(video.worldVideo!.position.x - video.worldPosition.x, video.worldVideo!.position.z - video.worldPosition.z)).toBeLessThan(1.5);
+    expect(Math.abs(video.worldVideo!.position.y - START.y)).toBeLessThan(0.5);
+    const planeNormal = Vector3.TransformNormal(new Vector3(0, 0, -1), Matrix.Compose(Vector3.One(), video.worldVideo!.rotation, Vector3.Zero()));
+    const towardStart = new Vector3(START.x - video.worldVideo!.position.x, 0, START.z - video.worldVideo!.position.z).normalize();
+    expect(Vector3.Dot(planeNormal, towardStart)).toBeGreaterThan(0.9);
+    const tracker = new PoiTracker(pois, 0.25);
+    expect(tracker.update(start, 0)).toEqual([]);
+    expect(tracker.update(start, 1000)).toEqual([]);
+  });
   it('maps approved source points through the reflected SOG host', () => {
     const host = Matrix.Scaling(1, -1, 1);
     const pois = resolvePois(parsePoiManifest(fixture(), MANIFEST_URL), host);
