@@ -14,6 +14,10 @@ await page.route('**/20260820_RondaLobato/lod-meta.json', async route => {
 await page.goto(process.argv[2] ?? 'http://127.0.0.1:5174/');
 await page.getByRole('alert').getByText(/HTTP 403/).waitFor({ timeout: 20000 });
 await page.getByRole('button', { name: 'Retry loading' }).click();
-await page.getByRole('status').getByText(/Scene ready/).waitFor({ timeout: 60000 });
-console.log(JSON.stringify({ firstRequestFailed: failures >= 2, retryReachedReady: true }));
+await page.waitForFunction(() => performance.getEntriesByType('resource').some(entry => entry.name.endsWith('.webp')), { timeout: 60000 });
+await page.getByRole('alert').waitFor({ state: 'hidden' });
+const visibleButtons = await page.locator('#overlay button:visible').allTextContents();
+const report = { firstRequestFailed: failures >= 2, retryLoadedChunk: true, visibleButtons };
+console.log(JSON.stringify(report));
 await browser.close();
+if (!report.firstRequestFailed || visibleButtons.length !== 1 || visibleButtons[0] !== 'Enter VR') process.exitCode = 1;

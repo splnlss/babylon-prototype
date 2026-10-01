@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@babylonjs/core": "9.28.0",
-    "@babylonjs/loaders": "9.28.0"
+    "@babylonjs/loaders": "9.28.0",
+    "hls.js": "1.7.3"
   },
   "devDependencies": {
     "happy-dom": "20.14.5",

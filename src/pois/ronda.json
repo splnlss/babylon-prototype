@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "assetUrl": "https://pub-dd92ae5131ec49f1bbd411b51a858249.r2.dev/20260820_RondaLobato/lod-meta.json",
+  "pois": [
+    {
+      "id": "video",
+      "title": "Video",
+      "kind": "video",
+      "position": [-0.7, -2, 18.5],
+      "standingRadius": 0.8,
+      "exitRadius": 1.1,
+      "muxPlaybackId": "00UWevxtFkfuKdqmXsJmdXqXXqWTcxSBjEuIrpejlYk00",
+      "video": {
+        "position": [-0.7, -3.6, 17.3],
+        "rotationDeg": [0, 205, 0],
+        "width": 1.6,
+        "height": 0.9
+      }
+    },
+    {
+      "id": "audio",
+      "title": "Audio",
+      "kind": "audio",
+      "position": [-2.4, -2, 18],
+      "standingRadius": 0.8,
+      "exitRadius": 1.1,
+      "muxPlaybackId": "BvRHSlj5WGXeIG2HCr5t9w02ZMUXmzLkKNYofkE02JgH00",
+      "fallbackUrl": "https://pub-dd92ae5131ec49f1bbd411b51a858249.r2.dev/20221110_rondajoseph-storyoutline_v1-AudioOnly.m4a"
+    }
+  ]
+}
