@@ -29,4 +29,19 @@ describe('shared media selection', () => {
     expect(retry).toHaveBeenCalledOnce(); expect(toggle).not.toHaveBeenCalled();
     scene.dispose(); engine.dispose();
   });
+
+  it('retries blocked media from a pointer-locked center click when the status plane is off axis', () => {
+    const engine = new NullEngine(); const scene = new Scene(engine);
+    const target = MeshBuilder.CreatePlane('retry', { size: 0.8 }, scene);
+    target.position.set(1, -0.65, 2);
+    target.computeWorldMatrix(true);
+    const toggle = vi.fn(); const retry = vi.fn();
+    const centerRay = new Ray(Vector3.Zero(), new Vector3(0, 0, 1), 10);
+    expect(selectMediaFromRay(scene, centerRay, [target], 'blocked', toggle, retry, true)).toBe(true);
+    expect(retry).toHaveBeenCalledOnce();
+    expect(toggle).not.toHaveBeenCalled();
+    expect(selectMediaFromRay(scene, centerRay, [target], 'playing', toggle, retry, true)).toBe(false);
+    expect(toggle).not.toHaveBeenCalled();
+    scene.dispose(); engine.dispose();
+  });
 });

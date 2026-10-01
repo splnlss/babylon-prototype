@@ -175,7 +175,7 @@ export class MediaPlayer {
 
   exit(id: string): void {
     if (this.active?.id === id && this.active.kind === 'video') this.stop();
-    else if (this.active?.id === id && this.active.kind === 'audio' && (this.status.phase === 'ended' || this.status.phase === 'error')) this.stop();
+    else if (this.active?.id === id && this.active.kind === 'audio' && (this.status.phase === 'ended' || this.status.phase === 'error' || this.status.phase === 'blocked')) this.stop();
   }
 
   toggleVideoFromGesture(): void {

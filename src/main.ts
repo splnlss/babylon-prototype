@@ -43,7 +43,7 @@ camera.maxZ = 500;
 scene.activeCamera = camera;
 const loadedPois = loadPoiManifest(poiJson, MANIFEST_URL);
 const poiManifest: PoiManifestV1 = loadedPois.manifest;
-overlay.setPoiWarning(loadedPois.warning);
+if (loadedPois.warning) console.warn(loadedPois.warning);
 const draft = createPoiDraft(poiManifest);
 const editorRequested = new URLSearchParams(location.search).get('poiEditor') === '1';
 let editorVisible = editorRequested;
@@ -52,8 +52,7 @@ let tracker: PoiTracker | null = null;
 let livePois: Poi[] = [];
 const media = new MediaPlayer();
 const poiScene = new PoiScene(scene);
-media.subscribe(status => { overlay.setMediaStatus(status); poiScene.setMediaStatus(status); });
-overlay.onMediaRetry(() => media.retryFromGesture());
+media.subscribe(status => poiScene.setMediaStatus(status));
 const editorRoot = document.querySelector<HTMLElement>('#overlay')!;
 let editorPanel: HTMLElement | null = null;
 if (editorRequested) {
@@ -64,15 +63,14 @@ if (editorRequested) {
     onChange: () => {
       if (!editorVisible) return;
       const resolved = tryResolvePois(draft, hostMatrix);
-      overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
       poiScene.setPois(resolved.pois, true);
     },
   });
   editorPanel = editorRoot.querySelector<HTMLElement>('.poi-editor');
 }
-function selectFromRay(ray: Ray): boolean {
+function selectFromRay(ray: Ray, retryOnMiss = false): boolean {
   return selectMediaFromRay(scene, ray, poiScene.selectableMeshes, media.status.phase,
-    () => media.toggleVideoFromGesture(), () => media.retryFromGesture());
+    () => media.toggleVideoFromGesture(), () => media.retryFromGesture(), retryOnMiss);
 }
 const desktopOptions = {
   shouldWalk: () => !isEditorFieldFocused(),
@@ -87,11 +85,10 @@ const desktopOptions = {
       event.clientY - rect.top,
       Matrix.Identity(), camera,
     );
-    return selectFromRay(ray);
+    return selectFromRay(ray, locked);
   },
 };
 let detachDesktop: (() => void) | null = attachDesktopControls(canvas, camera, scene, desktopOptions);
-document.addEventListener('pointerlockchange', () => overlay.setPointerLocked(document.pointerLockElement === canvas));
 let detachXr: (() => void) | null = null;
 let xr: WebXRDefaultExperience | null = null;
 let detachXrSelect: (() => void) | null = null;
@@ -106,7 +103,7 @@ async function loadScene() {
   tracker = null;
   livePois = [];
   poiScene.dispose();
-  overlay.setStatus('Loading scene manifest…');
+  overlay.clearError();
   try {
     const { metadata, rootUrl } = await fetchManifest(MANIFEST_URL);
     if (generation !== loadGeneration) return;
@@ -115,17 +112,15 @@ async function loadScene() {
     // This SOG's visual orientation was checked at the start pose. Keep Babylon's Y flip.
     stream.rotation.x = 0;
     hostMatrix = stream.computeWorldMatrix(true).clone();
-    overlay.setStatus('Streaming scene detail…');
     const current = stream;
     await current.whenSettledAsync();
     if (generation !== loadGeneration) return;
     if (current.isDisposed()) throw new Error(`Scene chunks failed to load from ${rootUrl}.`);
     const resolved = tryResolvePois(poiManifest, hostMatrix);
     livePois = resolved.pois;
-    overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
+    if (resolved.warning) console.warn(resolved.warning);
     tracker = new PoiTracker(livePois, 0.25);
     poiScene.setPois(editorVisible ? tryResolvePois(draft, hostMatrix).pois : livePois, editorVisible);
-    overlay.setStatus(xr?.baseExperience.state === WebXRState.IN_XR ? 'VR active · move with the left thumbstick' : 'Scene ready · walk to explore');
   } catch (error) {
     if (generation !== loadGeneration) return;
     overlay.setError(error instanceof Error ? error.message : String(error));
@@ -140,7 +135,6 @@ function setEditorVisible(visible: boolean): void {
   tracker?.reset();
   if (stream && tracker) {
     const resolved = visible ? tryResolvePois(draft, hostMatrix) : { pois: livePois, warning: null };
-    overlay.setPoiWarning(loadedPois.warning ?? resolved.warning);
     poiScene.setPois(resolved.pois, visible);
   }
 }
@@ -161,17 +155,6 @@ scene.onBeforeRenderObservable.add(() => {
   const view = inXr && xrCamera ? xrCamera : camera;
   poiScene.updateStatusPose(view.position, view.getForwardRay().direction);
 });
-
-function resetView() {
-  if (xr?.baseExperience.state === WebXRState.IN_XR) {
-    const xrCamera = xr.baseExperience.camera;
-    xrCamera.position.x = START.x;
-    xrCamera.position.z = START.z;
-    return;
-  }
-  camera.position.set(START.x, START.y, START.z);
-  camera.setTarget(new Vector3(TARGET.x, TARGET.y, TARGET.z));
-}
 
 async function setupXr() {
   if (!navigator.xr || !window.isSecureContext) {
@@ -211,7 +194,7 @@ async function setupXr() {
       }
     });
     experience.baseExperience.onInitialXRPoseSetObservable.add(xrCamera => {
-      xrCamera.position.set(START.x, START.y - 1.6, START.z);
+      xrCamera.position.set(START.x, POI_FLOOR_Y, START.z);
     });
     experience.baseExperience.onStateChangedObservable.add(state => {
       if (state === WebXRState.IN_XR) {
@@ -232,7 +215,6 @@ async function setupXr() {
         detachXrSelect = () => session.removeEventListener('select', onSelect);
         if (stream) stream.splatBudget = XR_SPLAT_BUDGET;
         overlay.setVrActive(true);
-        overlay.setStatus('VR active · move with the left thumbstick');
       } else if (state === WebXRState.NOT_IN_XR) {
         lastStereoIndex = null;
         detachXr?.();
@@ -243,18 +225,15 @@ async function setupXr() {
         if (!detachDesktop) detachDesktop = attachDesktopControls(canvas, camera, scene, desktopOptions);
         if (stream) stream.splatBudget = STREAM_OPTIONS.splatBudget;
         overlay.setVrActive(false);
-        overlay.setStatus('Scene ready · walk to explore');
       }
     });
     overlay.setVrAvailable(true);
   } catch (error) {
     overlay.setVrAvailable(false, error instanceof Error ? error.message : String(error));
-    overlay.setStatus(`VR unavailable: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 overlay.onRetry(() => { void loadScene(); });
-overlay.onReset(resetView);
 overlay.setVrAvailable(false, 'Checking immersive VR support');
 overlay.onEnterVr(() => {
   if (!xr) return;
@@ -262,7 +241,7 @@ overlay.onEnterVr(() => {
   const operation = experience.state === WebXRState.IN_XR
     ? experience.exitXRAsync()
     : experience.enterXRAsync('immersive-vr', 'local-floor', xr.renderTarget);
-  void operation.catch(error => overlay.setStatus(`VR entry failed: ${error instanceof Error ? error.message : String(error)}`));
+  void operation.catch(error => overlay.setError(`VR entry failed: ${error instanceof Error ? error.message : String(error)}`, false));
 });
 engine.runRenderLoop(() => scene.render());
 window.addEventListener('resize', () => engine.resize());

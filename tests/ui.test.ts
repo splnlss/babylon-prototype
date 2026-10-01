@@ -23,33 +23,33 @@ describe('overlay', () => {
   it('clears the error when loading resumes', () => {
     const overlay = createOverlay(document.querySelector('#overlay') as HTMLElement);
     overlay.setError('A chunk failed');
-    overlay.setStatus('Streaming scene…');
-    expect(document.querySelector('[role="status"]')?.textContent).toContain('Streaming scene');
+    overlay.clearError();
     expect(document.querySelector<HTMLButtonElement>('[data-action="retry"]')?.hidden).toBe(true);
     expect(document.querySelector<HTMLElement>('[role="alert"]')?.hidden).toBe(true);
   });
 
-  it('keeps VR unavailable while leaving Reset accessible', () => {
+  it('keeps VR unavailable in an unsupported browser', () => {
     const overlay = createOverlay(document.querySelector('#overlay') as HTMLElement);
-    let resets = 0;
-    overlay.onReset(() => { resets += 1; });
     overlay.setVrAvailable(false, 'Immersive VR is unavailable in this browser');
     const vr = document.querySelector<HTMLButtonElement>('[data-action="vr"]');
     expect(vr?.disabled).toBe(true);
     expect(vr?.title).toContain('unavailable');
-    expect(vr?.textContent).toContain('VR unavailable');
-    document.querySelector<HTMLButtonElement>('[data-action="reset"]')?.click();
-    expect(resets).toBe(1);
+    expect(vr?.textContent).toBe('Enter VR');
   });
 
-  it('places the VR action in the top overlay with a dedicated pill style', () => {
+  it('shows only the VR action during a successful scene load', () => {
     const overlay = createOverlay(document.querySelector('#overlay') as HTMLElement);
     const vr = document.querySelector<HTMLButtonElement>('[data-action="vr"]')!;
-    expect(vr.closest('.hud-top')).toBeTruthy();
     expect(vr.classList.contains('vr-button')).toBe(true);
     overlay.setVrAvailable(true);
+    overlay.clearError();
     expect(vr.disabled).toBe(false);
     expect(vr.textContent).toBe('Enter VR');
+    expect(document.querySelectorAll('button:not([hidden])')).toHaveLength(1);
+    expect(document.querySelector('[role="status"]')).toBeNull();
+    expect(document.querySelector('.brand,.controls-card,.scene-note,.reticle,.media-box,.poi-warning')).toBeNull();
+    expect(document.querySelector<HTMLElement>('[role="alert"]')?.hidden).toBe(true);
+    expect(document.querySelector('#overlay')?.textContent).not.toMatch(/Explore the scene|BABYLON WEBXR STUDY|Scene ready/i);
   });
 
   it('shows an unsupported browser error without offering a network retry', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Matrix, Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
-import { MANIFEST_URL, POI_FLOOR_Y, START } from '../src/config.js';
+import { MANIFEST_URL, POI_FLOOR_Y, START, TARGET } from '../src/config.js';
 import manifestJson from '../src/pois/ronda.json';
 import { parsePoiManifest, loadPoiManifest, resolvePois, tryResolvePois, xrStandingBody, PoiTracker } from '../src/pois.js';
 
@@ -21,6 +21,15 @@ function fixture() {
 }
 
 describe('POI manifest and mapping', () => {
+  it('starts facing 45 degrees left of the original pole-facing heading', () => {
+    const previousHeading = new Vector3(-3.5, 0, -6).normalize();
+    const heading = new Vector3(TARGET.x - START.x, 0, TARGET.z - START.z).normalize();
+    expect(TARGET.y).toBe(START.y);
+    expect(Vector3.Dot(previousHeading, heading)).toBeCloseTo(Math.SQRT1_2, 4);
+    // Babylon's default left-handed camera turns screen-left for negative Y yaw.
+    expect(Vector3.Cross(previousHeading, heading).y).toBeCloseTo(-Math.SQRT1_2, 4);
+  });
+
   it('uses the supplied Bob video playback ID in the shipped Ronda POI', () => {
     const manifest = parsePoiManifest(manifestJson, MANIFEST_URL);
     const video = manifest.pois.find(poi => poi.kind === 'video');
@@ -28,7 +37,8 @@ describe('POI manifest and mapping', () => {
   });
 
   it('starts outside both nearby pole POIs and keeps the video surface by its marker', () => {
-    expect([START.x, START.y, START.z]).toEqual([2.5, 1.2, 24]);
+    expect([START.x, START.y, START.z]).toEqual([2.5, 3.6, 24]);
+    expect(POI_FLOOR_Y).toBe(2);
     expect(START.y - POI_FLOOR_Y).toBeCloseTo(1.6);
     const pois = resolvePois(parsePoiManifest(manifestJson, MANIFEST_URL), Matrix.Scaling(1, -1, 1));
     const start = new Vector3(START.x, POI_FLOOR_Y, START.z);
@@ -39,8 +49,9 @@ describe('POI manifest and mapping', () => {
     }
     expect(Math.hypot(pois[0].worldPosition.x - pois[1].worldPosition.x, pois[0].worldPosition.z - pois[1].worldPosition.z)).toBeLessThan(2);
     const video = pois.find(poi => poi.kind === 'video')!;
+    expect(pois.every(poi => poi.worldPosition.y === POI_FLOOR_Y)).toBe(true);
     expect(Math.hypot(video.worldVideo!.position.x - video.worldPosition.x, video.worldVideo!.position.z - video.worldPosition.z)).toBeLessThan(1.5);
-    expect(Math.abs(video.worldVideo!.position.y - START.y)).toBeLessThan(0.5);
+    expect(video.worldVideo!.position.y).toBe(START.y);
     const planeNormal = Vector3.TransformNormal(new Vector3(0, 0, -1), Matrix.Compose(Vector3.One(), video.worldVideo!.rotation, Vector3.Zero()));
     const towardStart = new Vector3(START.x - video.worldVideo!.position.x, 0, START.z - video.worldVideo!.position.z).normalize();
     expect(Vector3.Dot(planeNormal, towardStart)).toBeGreaterThan(0.9);
@@ -105,6 +116,10 @@ describe('POI manifest and mapping', () => {
 });
 
 describe('PoiTracker', () => {
+  it('places a tracked 1.6-unit XR eye on the configured interaction floor', () => {
+    expect(xrStandingBody(new Vector3(START.x, START.y, START.z), 1.6).y).toBeCloseTo(POI_FLOOR_Y);
+  });
+
   it('uses the tracked XR head height to find the standing body floor', () => {
     expect(xrStandingBody(new Vector3(0, 5, 37), 1.6).asArray()).toEqual([0, 3.4, 37]);
   });

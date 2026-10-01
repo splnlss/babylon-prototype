@@ -87,6 +87,19 @@ describe('MediaPlayer', () => {
     expect(f.elements).toHaveLength(2);
   });
 
+  it('clears blocked audio on exit so returning can start a fresh source', async () => {
+    const f = fixture(new DOMException('blocked', 'NotAllowedError'));
+    f.player.activate(audio);
+    await Promise.resolve(); await Promise.resolve();
+    expect(f.player.status.phase).toBe('blocked');
+    f.player.exit('audio');
+    expect(f.player.status.phase).toBe('idle');
+    expect(f.elements[0].pause).toHaveBeenCalledOnce();
+    expect(f.elements[0].src).toBe('');
+    f.player.activate(audio);
+    expect(f.elements).toHaveLength(2);
+  });
+
   it('stops video on exit and on ended, even after a late source callback', () => {
     const f = fixture();
     f.player.activate(video);

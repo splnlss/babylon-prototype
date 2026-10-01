@@ -11,11 +11,15 @@ export function selectMediaFromRay(
   phase: MediaStatus['phase'],
   toggleVideo: () => void,
   retry: () => void,
+  retryOnMiss = false,
 ): boolean {
-  if (!targets.length) return false;
   const targetSet = new Set(targets);
-  const hit = scene.pickWithRay(ray, mesh => targetSet.has(mesh as Mesh));
-  if (!hit?.hit) return false;
+  const hit = targets.length ? scene.pickWithRay(ray, mesh => targetSet.has(mesh as Mesh)) : null;
+  if (!hit?.hit) {
+    if (!retryOnMiss || (phase !== 'blocked' && phase !== 'error')) return false;
+    retry();
+    return true;
+  }
   if (phase === 'blocked' || phase === 'error') retry();
   else toggleVideo();
   return true;
